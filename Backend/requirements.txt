@@ -1,0 +1,50 @@
+# Core Dependencies
+numpy
+pandas
+
+# Deep Learning Frameworks
+torch
+tensorflow
+
+# NLP & Transformers
+transformers
+nltk
+spacy
+
+# Embedding & Vector Search (RAG Pipeline)
+sentence-transformers
+faiss-cpu
+
+# Text Processing
+scikit-learn
+rouge-score
+bert-score
+
+# Utilities
+tqdm
+requests
+beautifulsoup4
+lxml
+
+# Jupyter & Development
+jupyter
+jupyterlab
+ipython
+matplotlib
+seaborn
+plotly
+
+# Code Quality
+black
+flake8
+pylint
+
+# API & Web (optional for deployment)
+fastapi
+uvicorn
+pydantic
+python-multipart
+
+# Export formats
+reportlab
+

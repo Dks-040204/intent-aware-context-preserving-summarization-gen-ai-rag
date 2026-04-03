@@ -1,0 +1,164 @@
+{
+  "info": {
+    "name": "Intent-Aware Context-Preserving Summarization System - API Tests",
+    "description": "Essential API tests for document summarization with intent and context preservation",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "✅ Health Check",
+      "request": {
+        "method": "GET",
+        "url": "http://localhost:8000/health"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": ["pm.test('API is healthy', function() { pm.response.to.have.status(200); });"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "📚 Get Languages",
+      "request": {
+        "method": "GET",
+        "url": "http://localhost:8000/languages"
+      }
+    },
+    {
+      "name": "🎯 Get Intents",
+      "request": {
+        "method": "GET",
+        "url": "http://localhost:8000/intents"
+      }
+    },
+    {
+      "name": "📝 Test 1: Short Document",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"document\": \"Machine learning enables systems to learn from data.\", \"intent\": \"technical_overview\", \"language\": \"english\"}"
+        },
+        "url": "http://localhost:8000/summarize"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Summary generated', function() {",
+              "  pm.response.to.have.status(200);",
+              "  var data = pm.response.json();",
+              "  pm.expect(data.summary).to.exist;",
+              "  console.log('Summary: ' + data.summary);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "📝 Test 2: Medium Document",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"document\": \"Deep learning is a subset of machine learning using neural networks with multiple layers. It has achieved state-of-the-art performance on computer vision, NLP, and speech recognition tasks.\", \"intent\": \"technical_overview\", \"language\": \"english\", \"quality_preference\": \"balanced\"}"
+        },
+        "url": "http://localhost:8000/summarize"
+      }
+    },
+    {
+      "name": "📝 Test 3: Long Document (RAG)",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"document\": \"Transformers have revolutionized NLP. The architecture uses self-attention mechanisms to compute representations. Each layer has multi-head self-attention and feed-forward networks. The encoder maps input to continuous representation while decoder generates output. BERT, GPT, and modern models use transformers. They achieve state-of-the-art results on machine translation, classification, QA, NER, and similarity tasks. Attention allows focusing on relevant parts. Self-attention learns dependencies regardless of distance. Position encoding injects relative position info. Layer normalization and residuals stabilize training. Transformers scale to billions of parameters like GPT-3. Pre-training on large corpora then fine-tuning is the dominant paradigm. Knowledge distillation creates efficient smaller versions.\", \"intent\": \"detailed_analysis\", \"language\": \"english\", \"quality_preference\": \"quality\"}"
+        },
+        "url": "http://localhost:8000/summarize"
+      }
+    },
+    {
+      "name": "📦 Test 4: Batch (3 docs)",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"documents\": [\"Machine learning is AI.\", \"Deep learning uses networks.\", \"NLP processes language.\"], \"intent\": \"technical_overview\"}"
+        },
+        "url": "http://localhost:8000/batch-summarize"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Batch returns 3 summaries', function() {",
+              "  pm.response.to.have.status(200);",
+              "  var data = pm.response.json();",
+              "  pm.expect(data.count).to.equal(3);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "🌐 Test 5: Spanish Language",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"document\": \"El aprendizaje automático es una rama de la inteligencia artificial. Permite que los sistemas aprendan de datos sin programación explícita.\", \"language\": \"spanish\", \"intent\": \"technical_overview\"}"
+        },
+        "url": "http://localhost:8000/summarize"
+      }
+    },
+    {
+      "name": "⚡ Test 6: Speed Mode",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"document\": \"AI is transforming technology.\", \"quality_preference\": \"speed\"}"
+        },
+        "url": "http://localhost:8000/summarize"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Speed mode < 2s', function() {",
+              "  pm.expect(pm.response.responseTime).to.be.below(2000);",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "testDoc1",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

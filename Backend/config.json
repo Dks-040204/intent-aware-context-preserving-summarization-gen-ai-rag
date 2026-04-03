@@ -1,0 +1,74 @@
+{
+  "project": {
+    "name": "Intent-Aware Context-Preserving Summarization System",
+    "version": "1.0.0",
+    "description": "Advanced summarization system for long technical documents using generative AI with RAG pipeline and intelligent model selection",
+    "author": "AI Development Team",
+    "license": "MIT"
+  },
+  "model": {
+    "primary_model": "t5-small",
+    "alternative_models": [
+      "t5-small",
+      "t5-base",
+      "t5-large",
+      "mbart-50-small",
+      "mt5-small",
+      "facebook/bart-base",
+      "facebook/bart-large-cnn",
+      "google/pegasus-arxiv",
+      "google/pegasus-pubmed",
+      "allenai/led-base-16384"
+    ],
+    "device": "auto",
+    "max_input_length": 512,
+    "max_output_length": 150,
+    "min_output_length": 50,
+    "num_beams": 2,
+    "supported_languages": [
+      "english", "spanish", "french", "german", "italian",
+      "portuguese", "chinese", "japanese", "korean", "arabic",
+      "hindi", "russian", "turkish", "vietnamese", "thai"
+    ],
+    "default_language": "english"
+  },
+  "summarization": {
+    "intent_types": [
+      "technical_overview",
+      "detailed_analysis",
+      "methodology",
+      "results",
+      "conclusion",
+      "abstract"
+    ],
+    "chunk_size": 512,
+    "chunk_overlap": 50,
+    "preserve_context": true
+  },
+  "preprocessing": {
+    "remove_citations": true,
+    "remove_equations": false,
+    "remove_stopwords": false,
+    "clean_text": true,
+    "normalize_whitespace": true
+  },
+  "evaluation": {
+    "metrics": ["rouge1", "rouge2", "rougeL", "bert_score"],
+    "use_stemmer": true,
+    "human_evaluation": true
+  },
+  "datasets": {
+    "sources": [
+      "arXiv",
+      "PubMed",
+      "Scientific Papers"
+    ],
+    "data_dir": "data/",
+    "cache_dir": "models/"
+  },
+  "output": {
+    "results_dir": "results/",
+    "save_format": "json",
+    "log_level": "INFO"
+  }
+}
