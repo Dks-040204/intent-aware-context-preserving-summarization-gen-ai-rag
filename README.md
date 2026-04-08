@@ -11,12 +11,11 @@
 - **Sentence-Transformers:** https://www.sbert.net/
 
 ### Research Papers
-- "Attention is All You Need" (Vaswani et al., 2017)
-- "BART: Denoising Sequence-to-Sequence Pretraining" (Lewis et al., 2019)
-- "PEGASUS: Pre-training with Extracted Gap-sentences for Abstractive Summarization" (Zhang et al., 2019)
-- "Exploring the Limits of Transfer Learning with a Unified Text-to-Text Transformer" (Raffel et al., 2019)
-- "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks" (Lewis et al., 2020)
-
+- "Retrieval-Augmented Generation for LLMs: A Survey," arXiv:2312.10997, 2024
+- "Abstractive text summarization: A comprehensive survey of techniques," Computer Science Review, 2025
+- "Self-RAG: Learning to Retrieve and Generate through Self-Reflection," ICLR, 2024
+- "The Llama 3 Herd of Models," Technical Report, 2024 
+- "RAGAS: Automated Evaluation of Retrieval Augmented Generation," arXiv, 2023
 ## 👥 Contributing
 
 Contributions welcome! Areas for improvement:
