@@ -85,9 +85,19 @@ def single_document_mode():
     
     # Export
     export_format = input("\nExport format (json/txt/pdf/md): ").strip() or 'txt'
-    if export_format in ['json', 'txt', 'pdf', 'md']:
-        export_method = getattr(exporter, f'export_{export_format}')
-        filepath = export_method(summary, title="Document Summary")
+    # ── Fix: method names don't all follow the f'export_{format}' pattern.
+    #         export_text (not export_txt) and export_markdown (not export_md).
+    _export_method_map = {
+        'json': 'export_json',
+        'txt':  'export_text',
+        'pdf':  'export_pdf',
+        'md':   'export_markdown',
+    }
+    if export_format in _export_method_map:
+        export_method = getattr(exporter, _export_method_map[export_format])
+        filepath = export_method(summary, title="Document Summary") \
+            if export_format in ('pdf', 'md') \
+            else export_method(summary)
         logger.info(f"✅ Exported to {filepath}")
 
 

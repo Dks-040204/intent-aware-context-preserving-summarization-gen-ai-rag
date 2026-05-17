@@ -4,10 +4,12 @@ REST API for summarization service using FastAPI
 
 import logging
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
 import uvicorn
 from .summarizer import TechnicalDocumentSummarizer
+from .keywords import KeywordExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +18,17 @@ app = FastAPI(
     title="Intent-Aware Document Summarizer API",
     description="Fast and multilingual document summarization service",
     version="1.0.0"
+)
+
+# ── CORS ──────────────────────────────────────────────────────────────────────
+# Allow any origin so the frontend (React/Vite/plain HTML) can call this API
+# regardless of the port it's served on. Restrict allow_origins in production.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Request/Response models
@@ -34,6 +47,38 @@ class BatchSummarizeRequest(BaseModel):
     language: str = "english"
 
 
+class AutoSummarizeRequest(BaseModel):
+    document: str
+    intent: str = "technical_overview"
+    language: str = "english"
+    quality_preference: str = "balanced"  # speed | balanced | quality
+    summary_level: str = "brief"          # executive | brief | detailed | bullets
+
+
+class AutoSummarizeResponse(BaseModel):
+    summary: str
+    intent: str
+    language: str
+    length: int
+    quality: str
+    model: str
+    complexity: str
+    use_rag: bool
+    estimated_time: str
+    reason: str
+
+
+class KeywordsRequest(BaseModel):
+    text: str
+    keywords_k: int = 8
+    phrases_k: int = 4
+
+
+class KeywordsResponse(BaseModel):
+    keywords: List[str]
+    key_phrases: List[str]
+
+
 class SummarizeResponse(BaseModel):
     summary: str
     intent: str
@@ -47,8 +92,9 @@ class BatchSummarizeResponse(BaseModel):
     count: int
 
 
-# Global summarizer instance (shared for efficiency)
+# Global singletons (shared for efficiency)
 _summarizer = None
+_keyword_extractor = None
 
 
 def get_summarizer(language: str = "english"):
@@ -58,6 +104,14 @@ def get_summarizer(language: str = "english"):
         logger.info(f"Initializing summarizer with language: {language}")
         _summarizer = TechnicalDocumentSummarizer(language=language)
     return _summarizer
+
+
+def get_keyword_extractor() -> KeywordExtractor:
+    """Get or create the keyword extractor singleton."""
+    global _keyword_extractor
+    if _keyword_extractor is None:
+        _keyword_extractor = KeywordExtractor()
+    return _keyword_extractor
 
 
 @app.on_event("startup")
@@ -202,6 +256,62 @@ async def get_supported_intents():
             "abstract"
         ]
     }
+
+
+@app.post("/auto-summarize", response_model=AutoSummarizeResponse)
+async def auto_summarize_endpoint(request: AutoSummarizeRequest):
+    """
+    Summarize with automatic model selection.
+    All four frontend options (intent, language, level, quality) are honoured.
+    """
+    try:
+        summarizer = get_summarizer(request.language)
+        result = summarizer.auto_summarize(
+            document=request.document,
+            intent=request.intent,
+            quality_preference=request.quality_preference,
+            summary_level=request.summary_level,
+            language=request.language,
+        )
+        summary = result.get('summary', '')
+        words = len(summary.split())
+        quality = "high" if words >= 60 else "medium" if words >= 25 else "low"
+        return AutoSummarizeResponse(
+            summary=summary,
+            intent=request.intent,
+            language=request.language,
+            length=words,
+            quality=quality,
+            model=result.get('model', 'unknown'),
+            complexity=str(result.get('complexity', 'unknown')),
+            use_rag=bool(result.get('use_rag', False)),
+            estimated_time=result.get('estimated_time', 'N/A'),
+            reason=result.get('reason', ''),
+        )
+    except Exception as e:
+        logger.error(f"Auto-summarize error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/keywords", response_model=KeywordsResponse)
+async def extract_keywords_endpoint(request: KeywordsRequest):
+    """
+    Extract keywords and key phrases from text.
+    """
+    try:
+        extractor = get_keyword_extractor()
+        result = extractor.extract_all(
+            request.text,
+            keywords_k=request.keywords_k,
+            phrases_k=request.phrases_k,
+        )
+        return KeywordsResponse(
+            keywords=result.get('keywords', []),
+            key_phrases=result.get('key_phrases', []),
+        )
+    except Exception as e:
+        logger.error(f"Keywords error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 def run_api(host: str = "0.0.0.0", port: int = 8000):

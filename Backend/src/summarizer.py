@@ -9,6 +9,15 @@ from .keywords import KeywordExtractor
 from .exporters import SummaryExporter
 from .rag import RAGPipeline, ContextPreserver as RAGContextPreserver
 from .model_selector import ModelSelector
+from .intent_engine import (
+    get_intent_config,
+    get_level_config,
+    get_quality_config,
+    extract_intent_relevant_text,
+    build_t5_input,
+    postprocess_summary,
+    translate_summary,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -64,94 +73,87 @@ class TechnicalDocumentSummarizer:
         document: str,
         intent: str = 'technical_overview',
         quality_preference: str = 'balanced',
+        summary_level: str = 'brief',
         language: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Automatically select best model and summarize.
-        
-        Args:
-            document: Document text
-            intent: Summarization intent
-            quality_preference: 'speed', 'balanced', or 'quality'
-            language: Language for summarization
-            
-        Returns:
-            Dictionary with summary and model selection info
+        Auto-select best model and summarize with full intent / level / quality / language support.
         """
         recommendation = self.model_selector.recommend_settings(document, quality_preference)
-        
-        logger.info(f"Model selection: {recommendation['model']}")
-        logger.info(f"Reason: {recommendation['reason']}")
-        logger.info(f"Estimated time: {recommendation['estimated_time']}")
-        
+        logger.info(f"Model={recommendation['model']} | quality={quality_preference} | intent={intent} | level={summary_level}")
+
         use_rag = recommendation.get('use_rag', False)
-        num_beams = recommendation.get('num_beams', 2)
-        max_length = recommendation.get('max_length', 150)
-        
+
+        # Merge level + quality + intent configs for generation params
+        level_cfg   = get_level_config(summary_level)
+        quality_cfg = get_quality_config(quality_preference)
+
+        max_length = level_cfg['max_length']
+        min_length = level_cfg['min_length']
+        num_beams  = max(recommendation.get('num_beams', 2), quality_cfg['num_beams'])
+
         summary = self.summarize(
             document,
             intent=intent,
+            summary_level=summary_level,
+            quality_preference=quality_preference,
             max_length=max_length,
+            min_length=min_length,
             num_beams=num_beams,
             language=language,
-            use_rag=use_rag
+            use_rag=use_rag,
         )
-        
+
         return {
             'summary': summary,
             'model': recommendation['model'],
             'complexity': str(self.model_selector.current_complexity),
             'use_rag': use_rag,
             'estimated_time': recommendation['estimated_time'],
-            'reason': recommendation['reason']
+            'reason': recommendation['reason'],
         }
     
     def summarize(
-        self, 
+        self,
         document: str,
         intent: str = 'technical_overview',
-        max_length: int = 150,
+        summary_level: str = 'brief',
+        quality_preference: str = 'balanced',
+        max_length: int = 130,
         min_length: int = 50,
-        num_beams: int = 2,
+        num_beams: int = 3,
         language: Optional[str] = None,
         use_rag: bool = False,
     ) -> str:
         """
-        Summarize a technical document in simple language.
-        
-        Args:
-            document: Document text to summarize (supports long papers)
-            intent: Summarization intent/style
-            max_length: Maximum length of summary (default: 150 tokens)
-            min_length: Minimum length of summary
-            num_beams: Number of beams for beam search (default: 2 for speed)
-            language: Override language for this summary
-            use_rag: Use RAG pipeline for context retrieval
-            
-        Returns:
-            Simplified summary text
+        Full intent-aware summarization pipeline:
+          1. Intent pre-filtering (sentence selection)
+          2. Optional RAG context retrieval
+          3. Model generation with quality-tuned params
+          4. Intent + level post-processing
+          5. Language translation (if non-English)
         """
         if language and language != self.language:
             self.model_loader.language = language
-            self.model_loader.language_code = self.model_loader.SUPPORTED_LANGUAGES.get(language.lower(), 'en_XX')
+            self.model_loader.language_code = self.model_loader.SUPPORTED_LANGUAGES.get(
+                language.lower(), 'en_XX'
+            )
             if hasattr(self.tokenizer, 'src_lang'):
                 self.tokenizer.src_lang = self.model_loader.language_code
-        
+
+        # Validate intent string
         if isinstance(intent, str):
             intent = self.intent_classifier.classify_intent(intent)
-        
-        cleaned_text = self.preprocessor.preprocess_document(
-            document,
-            remove_citations=True,
-            remove_equations=False
-        )
-        
-        abstract, remaining = self.parser.extract_abstract(cleaned_text)
-        
+
+        # ── Step 1: Intent-aware pre-filtering ──────────────────────────────
+        intent_text = extract_intent_relevant_text(document, intent, max_chars=3000)
+        logger.info(f"[Summarize] intent={intent} level={summary_level} quality={quality_preference}")
+        logger.info(f"[Summarize] pre-filter: {len(intent_text)} chars selected")
+
+        # ── Step 2: Optional RAG ────────────────────────────────────────────
         if use_rag:
-            indexing_stats = self.rag_pipeline.index_document(cleaned_text)
-            logger.info(f"Indexed document: {indexing_stats}")
-            
+            indexing_stats = self.rag_pipeline.index_document(intent_text)
+            logger.info(f"RAG indexed: {indexing_stats}")
             intent_prompt = self.intent_classifier.get_prompt_for_intent(intent)
             retrieved_chunks = self.rag_pipeline.retrieve_context(intent_prompt, k=3)
             summary_text = self.rag_pipeline.merge_context(
@@ -159,23 +161,24 @@ class TechnicalDocumentSummarizer:
                 [score for _, score in retrieved_chunks]
             )
         else:
-            summary_text = self._prepare_for_summarization(
-                abstract, 
-                remaining, 
-                max_length
-            )
-        
-        summary = self._generate_summary(
-            summary_text,
-            intent,
-            max_length,
-            min_length,
-            num_beams
+            summary_text = intent_text
+
+        # ── Step 3: Generate ────────────────────────────────────────────────
+        quality_cfg = get_quality_config(quality_preference)
+        raw_summary = self._generate_summary(
+            summary_text, intent, max_length, min_length,
+            num_beams, quality_cfg,
         )
-        
-        summary = self._simplify_language(summary)
-        
-        return summary
+
+        # ── Step 4: Post-process (intent format + level formatting) ─────────
+        formatted = postprocess_summary(raw_summary, intent, summary_level)
+
+        # ── Step 5: Translate if non-English ────────────────────────────────
+        target_lang = language or self.language
+        if target_lang and target_lang.lower() not in ('english', 'en'):
+            formatted = translate_summary(formatted, target_lang)
+
+        return formatted
     
     def _prepare_for_summarization(
         self, 
@@ -212,24 +215,18 @@ class TechnicalDocumentSummarizer:
         intent: str,
         max_length: int,
         min_length: int,
-        num_beams: int
+        num_beams: int,
+        quality_cfg: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
-        Generate summary text (optimized for speed).
-        
-        Args:
-            text: Text to summarize
-            intent: Intent for summarization
-            max_length: Maximum summary length
-            min_length: Minimum summary length
-            num_beams: Number of beams
-            
-        Returns:
-            Generated summary
+        Generate summary using the intent-aware T5 prefix.
+        quality_cfg controls beam search and repetition penalty.
         """
-        intent_prefix = self.intent_classifier.get_prompt_for_intent(intent)
-        input_text = f"summarize: {intent_prefix}: {text}"
-        
+        if quality_cfg is None:
+            quality_cfg = get_quality_config('balanced')
+
+        input_text = build_t5_input(text, intent)
+
         inputs = self.tokenizer(
             input_text,
             return_tensors='pt',
@@ -237,7 +234,7 @@ class TechnicalDocumentSummarizer:
             truncation=True,
             padding='max_length'
         ).to(self.device)
-        
+
         with torch.no_grad():
             summary_ids = self.model.generate(
                 inputs['input_ids'],
@@ -247,12 +244,12 @@ class TechnicalDocumentSummarizer:
                 num_beams=num_beams,
                 early_stopping=True,
                 do_sample=False,
-                temperature=1.0,
+                no_repeat_ngram_size=quality_cfg.get('no_repeat_ngram_size', 3),
+                length_penalty=quality_cfg.get('length_penalty', 1.2),
             )
-        
+
         summary = self.tokenizer.decode(summary_ids[0], skip_special_tokens=True)
-        
-        logger.info(f"Summary generated with intent: {intent} in {self.language}")
+        logger.info(f"[Generate] intent={intent} | words={len(summary.split())} | beams={num_beams}")
         return summary
     def _simplify_language(self, text: str) -> str:
         """

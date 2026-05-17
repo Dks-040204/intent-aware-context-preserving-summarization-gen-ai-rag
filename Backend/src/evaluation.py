@@ -57,32 +57,36 @@ class SummaryEvaluator:
         }
     
     def get_confidence_score(
-        self, 
+        self,
         model_output: torch.Tensor,
         summary: str
     ) -> float:
         """
         Calculate confidence score (0-1).
-        
+
         Args:
-            model_output: Raw model output logits
+            model_output: Raw model output logits (may be None when called
+                          without direct access to model outputs, e.g. from
+                          the REST API path or main.py single-doc mode).
             summary: Generated summary
-            
+
         Returns:
             Confidence score (0-1)
         """
-        # Based on model probabilities and summary length
-        if hasattr(model_output, 'sequences_scores'):
+        # ── Guard: no model output available ──────────────────────────────────
+        if model_output is None:
+            confidence = 0.5  # Neutral default when tensor not provided
+        elif hasattr(model_output, 'sequences_scores'):
             scores = model_output.sequences_scores
             confidence = torch.sigmoid(scores).item() if len(scores) > 0 else 0.5
         else:
             confidence = 0.5
-        
+
         # Adjust based on summary characteristics
         words = summary.split()
         if 5 <= len(words) <= 200:  # Reasonable length
             confidence *= 1.1
-        
+
         return min(confidence, 1.0)
     
     def evaluate_summary(
