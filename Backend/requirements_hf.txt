@@ -1,0 +1,29 @@
+# ── Contexto Backend – Hugging Face Spaces requirements ──────────────────────
+# CPU-only torch (much smaller than the full CUDA build)
+torch==2.2.2+cpu --extra-index-url https://download.pytorch.org/whl/cpu
+
+# NLP core
+transformers==4.40.1
+sentencepiece
+nltk
+
+# Embedding + vector search (RAG)
+sentence-transformers==2.7.0
+faiss-cpu==1.8.0
+
+# API framework
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+pydantic==2.7.1
+python-multipart
+
+# Text processing
+numpy
+scikit-learn
+rouge-score
+
+# Translation (for multilingual output)
+deep-translator==1.11.4
+
+# Document parsing (used by evaluation helpers)
+requests
