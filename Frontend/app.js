@@ -8,7 +8,9 @@
      POST /keywords        ← keyword + phrase extraction
    ═══════════════════════════════════════════════════════════════ */
 
-const API = 'http://localhost:8000';
+const API = (window.CONTEXTO_CONFIG && window.CONTEXTO_CONFIG.API_BASE_URL)
+  ? window.CONTEXTO_CONFIG.API_BASE_URL
+  : 'http://localhost:8000';   // fallback for local dev without config.js
 
 /* ── State ──────────────────────────────────────────────────── */
 let currentMode   = 'single';

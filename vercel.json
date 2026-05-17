@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "name": "contexto",
+  "builds": [
+    {
+      "src": "Frontend/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/Frontend/$1"
+    }
+  ]
+}
