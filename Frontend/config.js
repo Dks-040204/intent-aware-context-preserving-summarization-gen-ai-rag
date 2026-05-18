@@ -11,5 +11,5 @@
    ───────────────────────────────────────────────────────────────────── */
 
 window.CONTEXTO_CONFIG = {
-  API_BASE_URL: 'http://localhost:8000'   // ← change this for production
+  API_BASE_URL: 'https://Dev-ks04-contexto-api.hf.space'
 };
